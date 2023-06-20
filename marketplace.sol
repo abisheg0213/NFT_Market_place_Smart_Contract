@@ -1,117 +1,64 @@
-//SPDX-License-Identifier: Unlicense
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-import "hardhat/console.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
+
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-contract NFTMarketplace is ERC721URIStorage
+import "@openzeppelin/contracts/utils/Counters.sol";
+contract NFTMarket is ERC721URIStorage
 {
-    address payable owner;
     using Counters for Counters.Counter;
     Counters.Counter private tokenid;
-    Counters.Counter private itemsold;
-    uint public listprice=0.0001 ether;
-    constructor() ERC721("NFTMarketplace","NFTP")
-    {
+    Counters.Counter private itemssold;
+    uint private listingprice=100 wei;
+    constructor() ERC721("SENFT","SEN"){
         owner=payable(msg.sender);
-
     }
-    struct listeditems
+    address payable owner;
+    mapping (uint => marketitem) public idmarket;
+    struct marketitem
     {
-        uint tokenid;
-        address payable owner;
         address payable seller;
+        address payable owner;
         uint price;
-        bool islisted;
+        bool sold;
     }
-    mapping(uint=>listeditems)tokens;
-    modifier onlyowner()
+    modifier onlyowner(address a)
     {
-        require(msg.sender==owner);
+        require(a==owner);
         _;
     }
-    function update_list_price(uint p) public onlyowner 
+    function updatelistingprice(uint rate) public onlyowner(msg.sender)
     {
-        listprice=p;
+        listingprice=rate;
     }
-    function get_list_price() public view returns(uint)
+    function getlistingprice() public view returns(uint)
     {
-        return listprice;
+        return listingprice;
     }
-    function getLatesttoken() public view returns(listeditems memory)
+    function createtoken(string memory uri,uint price) public payable 
     {
-        return tokens[tokenid.current()];
-    }
-    function getlistedtoken(uint t) public view returns(listeditems memory)
-    {
-        return tokens[t];
-    }
-    function getcurrenttokenid() public view returns(uint)
-    {
-        return tokenid.current();
-    }
-    function createToken(string memory uri,uint p) public payable returns(uint)
-    {
-        require(msg.value==listprice);
-        require(p>0);
         tokenid.increment();
-        uint y=tokenid.current();
-        _safeMint(msg.sender, y);
-        _setTokenURI(y,uri);
-        cretelistedtoken(y,p);
-        return y;
-    } 
-    function cretelistedtoken(uint t,uint p) public 
-    {
-        tokens[t].tokenid=t;
-        tokens[t].owner=payable(address(this));
-        tokens[t].price=p;
-        tokens[t].seller=payable(msg.sender);
-        tokens[t].islisted=true;
-        _transfer(msg.sender, address(this), t);
+        owner.transfer(msg.value);
+        uint currentid=tokenid.current();
+        _safeMint(msg.sender, currentid);
+        _setTokenURI(currentid, uri);
+        createmarketitem(currentid,price);
     }
-    function getallNft() public view returns(listeditems[] memory)
+    function createmarketitem(uint tokenid,uint price) private
     {
-        uint count=tokenid.current();
-        listeditems[] memory arr=new listeditems[](count);
-        for (uint i=0;i<count;i++)
-        {
-            arr[i]=tokens[i+1];
-        }
-        return arr;
+        idmarket[tokenid].price=price;
+        idmarket[tokenid].sold=false;
+        idmarket[tokenid].seller=payable(msg.sender);
+        idmarket[tokenid].owner=payable(address(this));
+        _transfer(msg.sender, address(this), tokenid);
     }
-    function getmynfts() public view returns(listeditems[] memory)
+    function marketsale(uint tokenid) public payable 
     {
-
-   uint total_count=tokenid.current();
-        uint y=0;
-        uint count=0;
-         for (uint i=0;i<count;i++)
-        {
-            if(tokens[i+1].seller==msg.sender)
-            {
-            count+=1;
-            }
-        }
-            listeditems[] memory arr=new listeditems[](count);
-        for (uint i=0;i<total_count;i++)
-        {
-            if(tokens[i+1].seller==msg.sender)
-            {
-            arr[y]=(tokens[i+1]);
-            y+=1;
-            }
-        }
-        return arr;
-    }
-    function execute_sale(uint token_id) public payable
-    {
-        require(msg.value==tokens[token_id].price);
-        address payable s=payable(tokens[token_id].seller);
-        s.transfer(msg.value);
-        itemsold.increment();
-        _transfer(address(this), msg.sender,token_id);
-        approve(address(this), token_id);
-        payable(owner).transfer(listprice);
+        uint price=idmarket[tokenid].price;
+        require(msg.value==price);
+        idmarket[tokenid].owner=payable(msg.sender);
+        idmarket[tokenid].sold=true;
+        itemssold.increment();
+        _transfer(address(this), msg.sender, tokenid);
+        payable(idmarket[tokenid].seller).transfer(msg.value);
     }
 }
