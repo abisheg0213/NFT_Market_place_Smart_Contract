@@ -16,6 +16,7 @@ contract NFTMarket is ERC721URIStorage
     mapping (uint => marketitem) public idmarket;
     struct marketitem
     {
+        string uri;
         address payable seller;
         address payable owner;
         uint price;
@@ -34,19 +35,20 @@ contract NFTMarket is ERC721URIStorage
     {
         return listingprice;
     }
-    function createtoken(string memory uri,uint price) public payable 
+    function createtoken(string memory uri,uint price) public  payable 
     {
         tokenid.increment();
         owner.transfer(msg.value);
         uint currentid=tokenid.current();
         _safeMint(msg.sender, currentid);
         _setTokenURI(currentid, uri);
-        createmarketitem(currentid,price);
+        createmarketitem(currentid,price,uri);
     }
-    function createmarketitem(uint tokenid,uint price) private
+    function createmarketitem(uint tokenid,uint price,string memory u) private
     {
         idmarket[tokenid].price=price;
         idmarket[tokenid].sold=false;
+        idmarket[tokenid].uri=u;
         idmarket[tokenid].seller=payable(msg.sender);
         idmarket[tokenid].owner=payable(address(this));
         _transfer(msg.sender, address(this), tokenid);
@@ -60,5 +62,45 @@ contract NFTMarket is ERC721URIStorage
         itemssold.increment();
         _transfer(address(this), msg.sender, tokenid);
         payable(idmarket[tokenid].seller).transfer(msg.value);
+    }
+    uint public gh=0;
+    function fetchmarketitem() public view returns (marketitem[] memory)
+    {
+        uint itemcount=tokenid.current();
+        uint unsold=itemcount-itemssold.current();
+        marketitem [] memory kop=new marketitem[](unsold);
+        uint j=0;
+        for (uint i=itemcount;i>0;i--)
+        {
+            if(idmarket[i].sold==false)
+            {
+                kop[j]=idmarket[i];
+            }
+        }
+        return kop;
+        
+    }
+    function ownertokens(address ad) public view returns (marketitem[] memory)
+    {
+        uint count=tokenid.current();
+        uint own_count=0;
+        for (uint i=count;i>0;i--)
+        {
+            if(idmarket[i].owner==ad)
+            {
+                own_count++;
+            }
+        }
+        uint h=0;
+        marketitem[] memory own_list=new marketitem[](own_count);
+        for (uint i=count;i>0;i--)
+        {
+            if(idmarket[i].owner==ad)
+            {
+                own_list[h]=idmarket[i];
+                h++;
+            }
+        }
+        return own_list;
     }
 }
